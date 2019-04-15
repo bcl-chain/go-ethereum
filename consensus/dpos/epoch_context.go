@@ -148,8 +148,8 @@ func (ec *EpochContext) lookupValidator(now int64) (validator common.Address, er
 }
 
 func (ec *EpochContext) tryElect(genesis, parent *types.Header) error {
-	genesisEpoch := genesis.Time.Int64() / epochInterval
-	prevEpoch := parent.Time.Int64() / epochInterval
+	genesisEpoch := int64(genesis.Time) / epochInterval
+	prevEpoch := int64(parent.Time) / epochInterval
 	currentEpoch := ec.TimeStamp / epochInterval
 
 	prevEpochIsGenesis := prevEpoch == genesisEpoch
