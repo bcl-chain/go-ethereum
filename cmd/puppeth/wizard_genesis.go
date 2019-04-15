@@ -17,7 +17,6 @@
 package main
 
 import (
-	"bytes"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -51,60 +50,6 @@ func (w *wizard) makeGenesis() {
 			ByzantiumBlock:      big.NewInt(4),
 			ConstantinopleBlock: big.NewInt(5),
 		},
-	}
-	// Figure out which consensus engine to choose
-	fmt.Println()
-	fmt.Println("Which consensus engine to use? (default = clique)")
-	fmt.Println(" 1. Ethash - proof-of-work")
-	fmt.Println(" 2. Clique - proof-of-authority")
-
-	choice := w.read()
-	switch {
-	case choice == "1":
-		// In case of ethash, we're pretty much done
-		genesis.Config.Ethash = new(params.EthashConfig)
-		genesis.ExtraData = make([]byte, 32)
-
-	case choice == "" || choice == "2":
-		// In the case of clique, configure the consensus parameters
-		genesis.Difficulty = big.NewInt(1)
-		genesis.Config.Clique = &params.CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-		}
-		fmt.Println()
-		fmt.Println("How many seconds should blocks take? (default = 15)")
-		genesis.Config.Clique.Period = uint64(w.readDefaultInt(15))
-
-		// We also need the initial list of signers
-		fmt.Println()
-		fmt.Println("Which accounts are allowed to seal? (mandatory at least one)")
-
-		var signers []common.Address
-		for {
-			if address := w.readAddress(); address != nil {
-				signers = append(signers, *address)
-				continue
-			}
-			if len(signers) > 0 {
-				break
-			}
-		}
-		// Sort the signers and embed into the extra-data section
-		for i := 0; i < len(signers); i++ {
-			for j := i + 1; j < len(signers); j++ {
-				if bytes.Compare(signers[i][:], signers[j][:]) > 0 {
-					signers[i], signers[j] = signers[j], signers[i]
-				}
-			}
-		}
-		genesis.ExtraData = make([]byte, 32+len(signers)*common.AddressLength+65)
-		for i, signer := range signers {
-			copy(genesis.ExtraData[32+i*common.AddressLength:], signer[:])
-		}
-
-	default:
-		log.Crit("Invalid consensus engine choice", "choice", choice)
 	}
 	// Consensus all set, just ask for initial funds and go
 	fmt.Println()
@@ -238,37 +183,15 @@ func (w *wizard) manageGenesis() {
 		// Save whatever genesis configuration we currently have
 		fmt.Println()
 		fmt.Printf("Which folder to save the genesis specs into? (default = current)\n")
-		fmt.Printf("  Will create %s.json, %s-aleth.json, %s-harmony.json, %s-parity.json\n", w.network, w.network, w.network, w.network)
 
-		folder := w.readDefaultString(".")
-		if err := os.MkdirAll(folder, 0755); err != nil {
-			log.Error("Failed to create spec folder", "folder", folder, "err", err)
-			return
-		}
 		out, _ := json.MarshalIndent(w.conf.Genesis, "", "  ")
 
 		// Export the native genesis spec used by puppeth and Geth
-		gethJson := filepath.Join(folder, fmt.Sprintf("%s.json", w.network))
+		gethJson := w.readDefaultString(fmt.Sprintf("%s.json", w.network))
 		if err := ioutil.WriteFile((gethJson), out, 0644); err != nil {
 			log.Error("Failed to save genesis file", "err", err)
-			return
 		}
 		log.Info("Saved native genesis chain spec", "path", gethJson)
-
-		// Export the genesis spec used by Aleth (formerly C++ Ethereum)
-		if spec, err := newAlethGenesisSpec(w.network, w.conf.Genesis); err != nil {
-			log.Error("Failed to create Aleth chain spec", "err", err)
-		} else {
-			saveGenesis(folder, w.network, "aleth", spec)
-		}
-		// Export the genesis spec used by Parity
-		if spec, err := newParityChainSpec(w.network, w.conf.Genesis, []string{}); err != nil {
-			log.Error("Failed to create Parity chain spec", "err", err)
-		} else {
-			saveGenesis(folder, w.network, "parity", spec)
-		}
-		// Export the genesis spec used by Harmony (formerly EthereumJ
-		saveGenesis(folder, w.network, "harmony", w.conf.Genesis)
 
 	case "3":
 		// Make sure we don't have any services running
