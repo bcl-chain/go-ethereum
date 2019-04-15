@@ -154,7 +154,7 @@ func (d *Dpos) verifyHeader(chain consensus.ChainReader, header *types.Header, p
 	}
 	number := header.Number.Uint64()
 	// Unnecssary to verify the block from feature
-	if header.Time.Cmp(big.NewInt(time.Now().Unix())) > 0 {
+	if int64(header.Time) > time.Now().Unix() {
 		return consensus.ErrFutureBlock
 	}
 	// Check that the extra-data contains both the vanity and signature
@@ -190,7 +190,7 @@ func (d *Dpos) verifyHeader(chain consensus.ChainReader, header *types.Header, p
 	if parent == nil || parent.Number.Uint64() != number-1 || parent.Hash() != header.ParentHash {
 		return consensus.ErrUnknownAncestor
 	}
-	if parent.Time.Uint64()+uint64(blockInterval) > header.Time.Uint64() {
+	if parent.Time+uint64(blockInterval) > header.Time {
 		return ErrInvalidTimestamp
 	}
 	return nil
@@ -245,7 +245,7 @@ func (d *Dpos) verifySeal(chain consensus.ChainReader, header *types.Header, par
 		return err
 	}
 	epochContext := &EpochContext{DposContext: dposContext}
-	validator, err := epochContext.lookupValidator(header.Time.Int64())
+	validator, err := epochContext.lookupValidator(int64(header.Time))
 	if err != nil {
 		return err
 	}
@@ -286,7 +286,7 @@ func (d *Dpos) updateConfirmedBlockHeader(chain consensus.ChainReader) error {
 	validatorMap := make(map[common.Address]bool)
 	for d.confirmedBlockHeader.Hash() != curHeader.Hash() &&
 		d.confirmedBlockHeader.Number.Uint64() < curHeader.Number.Uint64() {
-		curEpoch := curHeader.Time.Int64() / epochInterval
+		curEpoch := int64(curHeader.Time) / epochInterval
 		if curEpoch != epoch {
 			epoch = curEpoch
 			validatorMap = make(map[common.Address]bool)
@@ -344,7 +344,7 @@ func (d *Dpos) Prepare(chain consensus.ChainReader, header *types.Header) error 
 	if parent == nil {
 		return consensus.ErrUnknownAncestor
 	}
-	header.Difficulty = d.CalcDifficulty(chain, header.Time.Uint64(), parent)
+	header.Difficulty = d.CalcDifficulty(chain, header.Time, parent)
 	header.Validator = d.signer
 	return nil
 }
@@ -369,11 +369,11 @@ func (d *Dpos) Finalize(chain consensus.ChainReader, header *types.Header, state
 	epochContext := &EpochContext{
 		statedb:     state,
 		DposContext: dposContext,
-		TimeStamp:   header.Time.Int64(),
+		TimeStamp:   int64(header.Time),
 	}
 	if timeOfFirstBlock == 0 {
 		if firstBlockHeader := chain.GetHeaderByNumber(1); firstBlockHeader != nil {
-			timeOfFirstBlock = firstBlockHeader.Time.Int64()
+			timeOfFirstBlock = int64(firstBlockHeader.Time)
 		}
 	}
 	genesis := chain.GetHeaderByNumber(0)
@@ -383,7 +383,7 @@ func (d *Dpos) Finalize(chain consensus.ChainReader, header *types.Header, state
 	}
 
 	//update mint count trie
-	updateMintCnt(parent.Time.Int64(), header.Time.Int64(), header.Validator, dposContext)
+	updateMintCnt(int64(parent.Time), int64(header.Time), header.Validator, dposContext)
 	header.DposContext = dposContext.ToProto()
 	header.Root = state.IntermediateRoot(chain.Config().IsEIP158(header.Number))
 	header.UncleHash = types.CalcUncleHash(nil)
@@ -393,11 +393,11 @@ func (d *Dpos) Finalize(chain consensus.ChainReader, header *types.Header, state
 func (d *Dpos) checkDeadline(lastBlock *types.Block, now int64) error {
 	prevSlot := PrevSlot(now)
 	nextSlot := NextSlot(now)
-	if lastBlock.Time().Int64() >= nextSlot {
+	if int64(lastBlock.Time()) >= nextSlot {
 		return ErrMintFutureBlock
 	}
 	// last block was arrived, or time's up
-	if lastBlock.Time().Int64() == prevSlot || nextSlot-now <= 1 {
+	if int64(lastBlock.Time()) == prevSlot || nextSlot-now <= 1 {
 		return nil
 	}
 	return ErrWaitForPrevBlock
@@ -440,7 +440,7 @@ func (d *Dpos) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan
 		case <-time.After(time.Duration(delay) * time.Second):
 		}
 	}
-	block.Header().Time.SetInt64(time.Now().Unix())
+	block.Header().Time = uint64(time.Now().Unix())
 
 	// time's up, sign the block
 	sighash, err := d.signFn(accounts.Account{Address: d.signer}, sigHash(header).Bytes())
