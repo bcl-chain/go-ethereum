@@ -32,6 +32,20 @@ var (
 )
 
 var (
+	DposChainConfig = &ChainConfig{
+		ChainID:        big.NewInt(5),
+		HomesteadBlock: big.NewInt(0),
+		DAOForkBlock:   nil,
+		DAOForkSupport: false,
+		EIP150Block:    big.NewInt(0),
+		EIP150Hash:     common.Hash{},
+		EIP155Block:    big.NewInt(0),
+		EIP158Block:    big.NewInt(0),
+		ByzantiumBlock: big.NewInt(0),
+
+		Dpos: &DposConfig{},
+	}
+	
 	// MainnetChainConfig is the chain parameters to run a node on the main network.
 	MainnetChainConfig = &ChainConfig{
 		ChainID:             big.NewInt(1),
@@ -45,7 +59,7 @@ var (
 		ByzantiumBlock:      big.NewInt(4370000),
 		ConstantinopleBlock: big.NewInt(7280000),
 		PetersburgBlock:     big.NewInt(7280000),
-		Ethash:              new(EthashConfig),
+		Dpos:              nil,
 	}
 
 	// MainnetTrustedCheckpoint contains the light client trusted checkpoint for the main network.
@@ -70,7 +84,7 @@ var (
 		ByzantiumBlock:      big.NewInt(1700000),
 		ConstantinopleBlock: big.NewInt(4230000),
 		PetersburgBlock:     big.NewInt(4939394),
-		Ethash:              new(EthashConfig),
+		Dpos:              nil,
 	}
 
 	// TestnetTrustedCheckpoint contains the light client trusted checkpoint for the Ropsten test network.
@@ -95,10 +109,7 @@ var (
 		ByzantiumBlock:      big.NewInt(1035301),
 		ConstantinopleBlock: big.NewInt(3660663),
 		PetersburgBlock:     big.NewInt(4321234),
-		Clique: &CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-		},
+		Dpos:              nil,
 	}
 
 	// RinkebyTrustedCheckpoint contains the light client trusted checkpoint for the Rinkeby test network.
@@ -122,10 +133,7 @@ var (
 		ByzantiumBlock:      big.NewInt(0),
 		ConstantinopleBlock: big.NewInt(0),
 		PetersburgBlock:     big.NewInt(0),
-		Clique: &CliqueConfig{
-			Period: 15,
-			Epoch:  30000,
-		},
+		Dpos:              nil,
 	}
 
 	// GoerliTrustedCheckpoint contains the light client trusted checkpoint for the Görli test network.
@@ -137,21 +145,7 @@ var (
 		BloomRoot:    common.HexToHash("0x50d672aeb655b723284969c7c1201fb6ca003c23ed144bcb9f2d1b30e2971c1b"),
 	}
 
-	// AllEthashProtocolChanges contains every protocol change (EIPs) introduced
-	// and accepted by the Ethereum core developers into the Ethash consensus.
-	//
-	// This configuration is intentionally not using keyed fields to force anyone
-	// adding flags to the config to also have to set these fields.
-	AllEthashProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil}
-
-	// AllCliqueProtocolChanges contains every protocol change (EIPs) introduced
-	// and accepted by the Ethereum core developers into the Clique consensus.
-	//
-	// This configuration is intentionally not using keyed fields to force anyone
-	// adding flags to the config to also have to set these fields.
-	AllCliqueProtocolChanges = &ChainConfig{big.NewInt(1337), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil, &CliqueConfig{Period: 0, Epoch: 30000}}
-
-	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, new(EthashConfig), nil}
+	TestChainConfig = &ChainConfig{big.NewInt(1), big.NewInt(0), nil, false, big.NewInt(0), common.Hash{}, big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), big.NewInt(0), nil, nil}
 	TestRules       = TestChainConfig.Rules(new(big.Int))
 )
 
@@ -192,17 +186,7 @@ type ChainConfig struct {
 	PetersburgBlock     *big.Int `json:"petersburgBlock,omitempty"`     // Petersburg switch block (nil = same as Constantinople)
 	EWASMBlock          *big.Int `json:"ewasmBlock,omitempty"`          // EWASM switch block (nil = no fork, 0 = already activated)
 
-	// Various consensus engines
-	Ethash *EthashConfig `json:"ethash,omitempty"`
-	Clique *CliqueConfig `json:"clique,omitempty"`
-}
-
-// EthashConfig is the consensus engine configs for proof-of-work based sealing.
-type EthashConfig struct{}
-
-// String implements the stringer interface, returning the consensus engine details.
-func (c *EthashConfig) String() string {
-	return "ethash"
+	Dpos *DposConfig `json:"dpos,omitempty"`
 }
 
 // CliqueConfig is the consensus engine configs for proof-of-authority based sealing.
@@ -216,17 +200,18 @@ func (c *CliqueConfig) String() string {
 	return "clique"
 }
 
+// DposConfig is the consensus engine configs for delegated proof-of-stake based sealing.
+type DposConfig struct {
+	Validators []common.Address `json:"validators"` // Genesis validator list
+}
+
+// String implements the stringer interface, returning the consensus engine details.
+func (d *DposConfig) String() string {
+	return "dpos"
+}
+
 // String implements the fmt.Stringer interface.
 func (c *ChainConfig) String() string {
-	var engine interface{}
-	switch {
-	case c.Ethash != nil:
-		engine = c.Ethash
-	case c.Clique != nil:
-		engine = c.Clique
-	default:
-		engine = "unknown"
-	}
 	return fmt.Sprintf("{ChainID: %v Homestead: %v DAO: %v DAOSupport: %v EIP150: %v EIP155: %v EIP158: %v Byzantium: %v Constantinople: %v  ConstantinopleFix: %v Engine: %v}",
 		c.ChainID,
 		c.HomesteadBlock,
@@ -238,7 +223,7 @@ func (c *ChainConfig) String() string {
 		c.ByzantiumBlock,
 		c.ConstantinopleBlock,
 		c.PetersburgBlock,
-		engine,
+		c.Dpos,
 	)
 }
 
