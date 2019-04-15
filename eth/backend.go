@@ -29,7 +29,7 @@ import (
 	"github.com/ethereum/go-ethereum/common"
 	"github.com/ethereum/go-ethereum/common/hexutil"
 	"github.com/ethereum/go-ethereum/consensus"
-	"github.com/ethereum/go-ethereum/consensus/clique"
+	"github.com/ethereum/go-ethereum/consensus/dpos"
 	"github.com/ethereum/go-ethereum/consensus/ethash"
 	"github.com/ethereum/go-ethereum/core"
 	"github.com/ethereum/go-ethereum/core/bloombits"
@@ -86,6 +86,7 @@ type Ethereum struct {
 
 	miner     *miner.Miner
 	gasPrice  *big.Int
+		validator common.Address
 	etherbase common.Address
 
 	networkID     uint64
@@ -134,6 +135,7 @@ func New(ctx *node.ServiceContext, config *Config) (*Ethereum, error) {
 		shutdownChan:   make(chan bool),
 		networkID:      config.NetworkId,
 		gasPrice:       config.MinerGasPrice,
+		validator:      config.Validator,
 		etherbase:      config.Etherbase,
 		bloomRequests:  make(chan chan *bloombits.Retrieval),
 		bloomIndexer:   NewBloomIndexer(chainDb, params.BloomBitsBlocks, params.BloomConfirms),
@@ -223,33 +225,34 @@ func CreateDB(ctx *node.ServiceContext, config *Config, name string) (ethdb.Data
 
 // CreateConsensusEngine creates the required type of consensus engine instance for an Ethereum service
 func CreateConsensusEngine(ctx *node.ServiceContext, chainConfig *params.ChainConfig, config *ethash.Config, notify []string, noverify bool, db ethdb.Database) consensus.Engine {
-	// If proof-of-authority is requested, set it up
-	if chainConfig.Clique != nil {
-		return clique.New(chainConfig.Clique, db)
-	}
-	// Otherwise assume proof-of-work
-	switch config.PowMode {
-	case ethash.ModeFake:
-		log.Warn("Ethash used in fake mode")
-		return ethash.NewFaker()
-	case ethash.ModeTest:
-		log.Warn("Ethash used in test mode")
-		return ethash.NewTester(nil, noverify)
-	case ethash.ModeShared:
-		log.Warn("Ethash used in shared mode")
-		return ethash.NewShared()
-	default:
-		engine := ethash.New(ethash.Config{
-			CacheDir:       ctx.ResolvePath(config.CacheDir),
-			CachesInMem:    config.CachesInMem,
-			CachesOnDisk:   config.CachesOnDisk,
-			DatasetDir:     config.DatasetDir,
-			DatasetsInMem:  config.DatasetsInMem,
-			DatasetsOnDisk: config.DatasetsOnDisk,
-		}, notify, noverify)
-		engine.SetThreads(-1) // Disable CPU mining
-		return engine
-	}
+	//	// If proof-of-authority is requested, set it up
+	//	if chainConfig.Clique != nil {
+	//		return clique.New(chainConfig.Clique, db)
+	//	}
+	//	// Otherwise assume proof-of-work
+	//	switch config.PowMode {
+	//	case ethash.ModeFake:
+	//		log.Warn("Ethash used in fake mode")
+	//		return ethash.NewFaker()
+	//	case ethash.ModeTest:
+	//		log.Warn("Ethash used in test mode")
+	//		return ethash.NewTester(nil, noverify)
+	//	case ethash.ModeShared:
+	//		log.Warn("Ethash used in shared mode")
+	//		return ethash.NewShared()
+	//	default:
+	//		engine := ethash.New(ethash.Config{
+	//			CacheDir:       ctx.ResolvePath(config.CacheDir),
+	//			CachesInMem:    config.CachesInMem,
+	//			CachesOnDisk:   config.CachesOnDisk,
+	//			DatasetDir:     config.DatasetDir,
+	//			DatasetsInMem:  config.DatasetsInMem,
+	//			DatasetsOnDisk: config.DatasetsOnDisk,
+	//		}, notify, noverify)
+	//		engine.SetThreads(-1) // Disable CPU mining
+	//		return engine
+	//	}
+	return dpos.New(chainConfig.Dpos, db)
 }
 
 // APIs return the collection of RPC services the ethereum package offers.
@@ -313,6 +316,29 @@ func (s *Ethereum) ResetWithGenesisBlock(gb *types.Block) {
 	s.blockchain.ResetWithGenesisBlock(gb)
 }
 
+func (s *Ethereum) Validator() (validator common.Address, err error) {
+	s.lock.RLock()
+	validator = s.validator
+	s.lock.RUnlock()
+
+	if validator != (common.Address{}) {
+		return validator, nil
+	}
+	if wallets := s.AccountManager().Wallets(); len(wallets) > 0 {
+		if accounts := wallets[0].Accounts(); len(accounts) > 0 {
+			return accounts[0].Address, nil
+		}
+	}
+	return common.Address{}, fmt.Errorf("validator address must be explicitly specified")
+}
+
+// set in js console via admin interface or wrapper from cli flags
+func (self *Ethereum) SetValidator(validator common.Address) {
+	self.lock.Lock()
+	self.validator = validator
+	self.lock.Unlock()
+}
+
 func (s *Ethereum) Etherbase() (eb common.Address, err error) {
 	s.lock.RLock()
 	etherbase := s.etherbase
@@ -368,26 +394,27 @@ func (s *Ethereum) isLocalBlock(block *types.Block) bool {
 // during the chain reorg depending on whether the author of block
 // is a local account.
 func (s *Ethereum) shouldPreserve(block *types.Block) bool {
-	// The reason we need to disable the self-reorg preserving for clique
-	// is it can be probable to introduce a deadlock.
-	//
-	// e.g. If there are 7 available signers
-	//
-	// r1   A
-	// r2     B
-	// r3       C
-	// r4         D
-	// r5   A      [X] F G
-	// r6    [X]
-	//
-	// In the round5, the inturn signer E is offline, so the worst case
-	// is A, F and G sign the block of round5 and reject the block of opponents
-	// and in the round6, the last available signer B is offline, the whole
-	// network is stuck.
-	if _, ok := s.engine.(*clique.Clique); ok {
-		return false
-	}
-	return s.isLocalBlock(block)
+//	// The reason we need to disable the self-reorg preserving for clique
+//	// is it can be probable to introduce a deadlock.
+//	//
+//	// e.g. If there are 7 available signers
+//	//
+//	// r1   A
+//	// r2     B
+//	// r3       C
+//	// r4         D
+//	// r5   A      [X] F G
+//	// r6    [X]
+//	//
+//	// In the round5, the inturn signer E is offline, so the worst case
+//	// is A, F and G sign the block of round5 and reject the block of opponents
+//	// and in the round6, the last available signer B is offline, the whole
+//	// network is stuck.
+//	if _, ok := s.engine.(*clique.Clique); ok {
+//		return false
+//	}
+//	return s.isLocalBlock(block)
+	return false //we accept only dpos consensus
 }
 
 // SetEtherbase sets the mining reward address.
@@ -422,19 +449,24 @@ func (s *Ethereum) StartMining(threads int) error {
 		s.lock.RUnlock()
 		s.txPool.SetGasPrice(price)
 
+	validator, err := s.Validator()
+	if err != nil {
+		log.Error("Cannot start mining without validator", "err", err)
+		return fmt.Errorf("validator missing: %v", err)
+	}
 		// Configure the local mining address
 		eb, err := s.Etherbase()
 		if err != nil {
 			log.Error("Cannot start mining without etherbase", "err", err)
 			return fmt.Errorf("etherbase missing: %v", err)
 		}
-		if clique, ok := s.engine.(*clique.Clique); ok {
-			wallet, err := s.accountManager.Find(accounts.Account{Address: eb})
+		if dpos, ok := s.engine.(*dpos.Dpos); ok {
+			wallet, err := s.accountManager.Find(accounts.Account{Address: validator})
 			if wallet == nil || err != nil {
 				log.Error("Etherbase account unavailable locally", "err", err)
 				return fmt.Errorf("signer missing: %v", err)
 			}
-			clique.Authorize(eb, wallet.SignHash)
+			dpos.Authorize(eb, wallet.SignHash)
 		}
 		// If mining is started, we can disable the transaction rejection mechanism
 		// introduced to speed sync times.
