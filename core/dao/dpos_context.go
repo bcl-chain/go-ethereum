@@ -6,10 +6,10 @@ import (
 	"fmt"
 
 	"github.com/ethereum/go-ethereum/common"
-	"golang.org/x/crypto/sha3"
 	"github.com/ethereum/go-ethereum/ethdb"
 	"github.com/ethereum/go-ethereum/rlp"
 	"github.com/ethereum/go-ethereum/trie"
+	"golang.org/x/crypto/sha3"
 )
 
 type DposContext struct {
@@ -31,23 +31,23 @@ var (
 )
 
 func NewEpochTrie(root common.Hash, db ethdb.Database) (*trie.Trie, error) {
-	return trie.NewTrieWithPrefix(root, epochPrefix, db)
+	return trie.NewTrieWithPrefix(root, epochPrefix, trie.NewDatabase(db))
 }
 
 func NewDelegateTrie(root common.Hash, db ethdb.Database) (*trie.Trie, error) {
-	return trie.NewTrieWithPrefix(root, delegatePrefix, db)
+	return trie.NewTrieWithPrefix(root, delegatePrefix, trie.NewDatabase(db))
 }
 
 func NewVoteTrie(root common.Hash, db ethdb.Database) (*trie.Trie, error) {
-	return trie.NewTrieWithPrefix(root, votePrefix, db)
+	return trie.NewTrieWithPrefix(root, votePrefix, trie.NewDatabase(db))
 }
 
 func NewCandidateTrie(root common.Hash, db ethdb.Database) (*trie.Trie, error) {
-	return trie.NewTrieWithPrefix(root, candidatePrefix, db)
+	return trie.NewTrieWithPrefix(root, candidatePrefix, trie.NewDatabase(db))
 }
 
 func NewMintCntTrie(root common.Hash, db ethdb.Database) (*trie.Trie, error) {
-	return trie.NewTrieWithPrefix(root, mintCntPrefix, db)
+	return trie.NewTrieWithPrefix(root, mintCntPrefix, trie.NewDatabase(db))
 }
 
 func NewDposContext(db ethdb.Database) (*DposContext, error) {
@@ -296,24 +296,24 @@ func (d *DposContext) UnDelegate(delegatorAddr, candidateAddr common.Address) er
 	return d.voteTrie.TryDelete(delegator)
 }
 
-func (d *DposContext) CommitTo(dbw trie.DatabaseWriter) (*DposContextProto, error) {
-	epochRoot, err := d.epochTrie.CommitTo(dbw)
+func (d *DposContext) CommitTo() (*DposContextProto, error) {
+	epochRoot, err := d.epochTrie.Commit(nil)
 	if err != nil {
 		return nil, err
 	}
-	delegateRoot, err := d.delegateTrie.CommitTo(dbw)
+	delegateRoot, err := d.delegateTrie.Commit(nil)
 	if err != nil {
 		return nil, err
 	}
-	voteRoot, err := d.voteTrie.CommitTo(dbw)
+	voteRoot, err := d.voteTrie.Commit(nil)
 	if err != nil {
 		return nil, err
 	}
-	candidateRoot, err := d.candidateTrie.CommitTo(dbw)
+	candidateRoot, err := d.candidateTrie.Commit(nil)
 	if err != nil {
 		return nil, err
 	}
-	mintCntRoot, err := d.mintCntTrie.CommitTo(dbw)
+	mintCntRoot, err := d.mintCntTrie.Commit(nil)
 	if err != nil {
 		return nil, err
 	}
