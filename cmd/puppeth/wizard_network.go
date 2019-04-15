@@ -187,7 +187,6 @@ func (w *wizard) deployComponent() {
 	case "3":
 		w.deployNode(false)
 	case "4":
-		w.deployExplorer()
 	case "5":
 		w.deployWallet()
 	case "6":
