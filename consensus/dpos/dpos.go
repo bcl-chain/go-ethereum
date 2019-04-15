@@ -424,19 +424,18 @@ func (d *Dpos) CheckValidator(lastBlock *types.Block, now int64) error {
 
 // Seal generates a new block for the given input block with the local miner's
 // seal place on top.
-func (d *Dpos) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan struct{}) (*types.Block, error) {
+func (d *Dpos) Seal(chain consensus.ChainReader, block *types.Block, results chan<- *types.Block, stop <-chan struct{}) error {
 	header := block.Header()
 	number := header.Number.Uint64()
 	// Sealing the genesis block is not supported
 	if number == 0 {
-		return nil, errUnknownBlock
+		return errUnknownBlock
 	}
-	now := time.Now().Unix()
-	delay := NextSlot(now) - now
+	delay := time.Unix(int64(header.Time), 0).Sub(time.Now())
 	if delay > 0 {
 		select {
 		case <-stop:
-			return nil, nil
+			return nil
 		case <-time.After(time.Duration(delay) * time.Second):
 		}
 	}
@@ -445,10 +444,26 @@ func (d *Dpos) Seal(chain consensus.ChainReader, block *types.Block, stop <-chan
 	// time's up, sign the block
 	sighash, err := d.signFn(accounts.Account{Address: d.signer}, sigHash(header).Bytes())
 	if err != nil {
-		return nil, err
+		return err
 	}
 	copy(header.Extra[len(header.Extra)-extraSeal:], sighash)
-	return block.WithSeal(header), nil
+	// Wait until sealing is terminated or delay timeout.
+	log.Trace("Waiting for slot to sign and propagate", "delay", common.PrettyDuration(delay))
+	go func() {
+		select {
+		case <-stop:
+			return
+		case <-time.After(delay):
+		}
+
+		select {
+		case results <- block.WithSeal(header):
+		default:
+			log.Warn("Sealing result is not read by miner", "sealhash", d.SealHash(header))
+		}
+	}()
+
+	return nil
 }
 
 func (d *Dpos) CalcDifficulty(chain consensus.ChainReader, time uint64, parent *types.Header) *big.Int {
@@ -531,4 +546,14 @@ func updateMintCnt(parentBlockTime, currentBlockTime int64, validator common.Add
 	binary.BigEndian.PutUint64(newEpochBytes, uint64(newEpoch))
 	binary.BigEndian.PutUint64(newCntBytes, uint64(cnt))
 	dposContext.MintCntTrie().TryUpdate(append(newEpochBytes, validator.Bytes()...), newCntBytes)
+}
+
+// SealHash returns the hash of a block prior to it being sealed.
+func (d *Dpos) SealHash(header *types.Header) common.Hash {
+	return sigHash(header)
+}
+
+// Close implements consensus.Engine. It's a noop for dpos as there are no background threads.
+func (d *Dpos) Close() error {
+	return nil
 }
