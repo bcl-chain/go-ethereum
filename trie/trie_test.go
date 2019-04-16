@@ -627,3 +627,34 @@ func TestDecodeNode(t *testing.T) {
 		decodeNode(hash, elems, 1)
 	}
 }
+
+// Used for testing
+func newEmptyTrieWithPrefix() *Trie {
+	prefix := []byte("test")
+	trie, _ := NewTrieWithPrefix(common.Hash{}, prefix, NewDatabase(ethdb.NewMemDatabase()))
+	return trie
+}
+
+func TestGetFromPrefixTrie(t *testing.T) {
+	trie := newEmpty()
+	updateString(trie, "doe", "reindeer")
+	updateString(trie, "dog", "puppy")
+	updateString(trie, "dogglesworth", "cat")
+
+	for i := 0; i < 2; i++ {
+		res := getString(trie, "dog")
+		if !bytes.Equal(res, []byte("puppy")) {
+			t.Errorf("expected puppy got %x", res)
+		}
+
+		unknown := getString(trie, "unknown")
+		if unknown != nil {
+			t.Errorf("expected nil got %x", unknown)
+		}
+
+		if i == 1 {
+			return
+		}
+		trie.Commit(nil)
+	}
+}
