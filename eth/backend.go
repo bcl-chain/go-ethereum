@@ -86,7 +86,7 @@ type Ethereum struct {
 
 	miner     *miner.Miner
 	gasPrice  *big.Int
-		validator common.Address
+	validator common.Address
 	etherbase common.Address
 
 	networkID     uint64
@@ -394,26 +394,26 @@ func (s *Ethereum) isLocalBlock(block *types.Block) bool {
 // during the chain reorg depending on whether the author of block
 // is a local account.
 func (s *Ethereum) shouldPreserve(block *types.Block) bool {
-//	// The reason we need to disable the self-reorg preserving for clique
-//	// is it can be probable to introduce a deadlock.
-//	//
-//	// e.g. If there are 7 available signers
-//	//
-//	// r1   A
-//	// r2     B
-//	// r3       C
-//	// r4         D
-//	// r5   A      [X] F G
-//	// r6    [X]
-//	//
-//	// In the round5, the inturn signer E is offline, so the worst case
-//	// is A, F and G sign the block of round5 and reject the block of opponents
-//	// and in the round6, the last available signer B is offline, the whole
-//	// network is stuck.
-//	if _, ok := s.engine.(*clique.Clique); ok {
-//		return false
-//	}
-//	return s.isLocalBlock(block)
+	//	// The reason we need to disable the self-reorg preserving for clique
+	//	// is it can be probable to introduce a deadlock.
+	//	//
+	//	// e.g. If there are 7 available signers
+	//	//
+	//	// r1   A
+	//	// r2     B
+	//	// r3       C
+	//	// r4         D
+	//	// r5   A      [X] F G
+	//	// r6    [X]
+	//	//
+	//	// In the round5, the inturn signer E is offline, so the worst case
+	//	// is A, F and G sign the block of round5 and reject the block of opponents
+	//	// and in the round6, the last available signer B is offline, the whole
+	//	// network is stuck.
+	//	if _, ok := s.engine.(*clique.Clique); ok {
+	//		return false
+	//	}
+	//	return s.isLocalBlock(block)
 	return false //we accept only dpos consensus
 }
 
@@ -449,11 +449,11 @@ func (s *Ethereum) StartMining(threads int) error {
 		s.lock.RUnlock()
 		s.txPool.SetGasPrice(price)
 
-	validator, err := s.Validator()
-	if err != nil {
-		log.Error("Cannot start mining without validator", "err", err)
-		return fmt.Errorf("validator missing: %v", err)
-	}
+		validator, err := s.Validator()
+		if err != nil {
+			log.Error("Cannot start mining without validator", "err", err)
+			return fmt.Errorf("validator missing: %v", err)
+		}
 		// Configure the local mining address
 		eb, err := s.Etherbase()
 		if err != nil {

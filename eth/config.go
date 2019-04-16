@@ -103,7 +103,7 @@ type Config struct {
 	TrieTimeout        time.Duration
 
 	// Mining-related options
-	Validator    common.Address `toml:",omitempty"`
+	Validator      common.Address `toml:",omitempty"`
 	Etherbase      common.Address `toml:",omitempty"`
 	MinerNotify    []string       `toml:",omitempty"`
 	MinerExtraData []byte         `toml:",omitempty"`
