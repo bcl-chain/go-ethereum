@@ -297,23 +297,23 @@ func (d *DposContext) UnDelegate(delegatorAddr, candidateAddr common.Address) er
 }
 
 func (d *DposContext) CommitTo() (*DposContextProto, error) {
-	epochRoot, err := d.epochTrie.Commit(nil)
+	epochRoot, err := d.epochTrie.CommitToDisk(nil)
 	if err != nil {
 		return nil, err
 	}
-	delegateRoot, err := d.delegateTrie.Commit(nil)
+	delegateRoot, err := d.delegateTrie.CommitToDisk(nil)
 	if err != nil {
 		return nil, err
 	}
-	voteRoot, err := d.voteTrie.Commit(nil)
+	voteRoot, err := d.voteTrie.CommitToDisk(nil)
 	if err != nil {
 		return nil, err
 	}
-	candidateRoot, err := d.candidateTrie.Commit(nil)
+	candidateRoot, err := d.candidateTrie.CommitToDisk(nil)
 	if err != nil {
 		return nil, err
 	}
-	mintCntRoot, err := d.mintCntTrie.Commit(nil)
+	mintCntRoot, err := d.mintCntTrie.CommitToDisk(nil)
 	if err != nil {
 		return nil, err
 	}
