@@ -503,3 +503,11 @@ func (t *Trie) hashRoot(db *Database, onleaf LeafCallback) (node, node, error) {
 	defer returnHasherToPool(h)
 	return h.hash(t.root, db, true)
 }
+
+func (t *Trie) CommitToDisk(onleaf LeafCallback)  (common.Hash, error) {
+	root, err := t.Commit(onleaf)
+	if err != nil {
+		return common.Hash{}, err
+	}
+	return root, t.db.Commit(root, false)
+}
