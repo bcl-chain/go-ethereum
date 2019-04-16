@@ -616,13 +616,18 @@ func (w *worker) makeCurrent(parent *types.Block, header *types.Header) error {
 	if err != nil {
 		return err
 	}
+	dposContext, err := w.chain.DposContextFromProtoAt(parent.Header().DposContext)
+	if err != nil {
+		return err
+	}
 	env := &environment{
-		signer:    types.NewEIP155Signer(w.config.ChainID),
-		state:     state,
-		ancestors: mapset.NewSet(),
-		family:    mapset.NewSet(),
-		uncles:    mapset.NewSet(),
-		header:    header,
+		signer:      types.NewEIP155Signer(w.config.ChainID),
+		state:       state,
+		dposContext: dposContext,
+		ancestors:   mapset.NewSet(),
+		family:      mapset.NewSet(),
+		uncles:      mapset.NewSet(),
+		header:      header,
 	}
 
 	// when 08 is processed ancestors contain 07 (quick block)
@@ -694,10 +699,11 @@ func (w *worker) updateSnapshot() {
 
 func (w *worker) commitTransaction(tx *types.Transaction, coinbase common.Address) ([]*types.Log, error) {
 	snap := w.current.state.Snapshot()
-
-	receipt, _, err := core.ApplyTransaction(w.config, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
+	dposSnap := w.current.dposContext.Snapshot()
+	receipt, _, err := core.ApplyTransaction(w.config, w.current.dposContext, w.chain, &coinbase, w.current.gasPool, w.current.state, w.current.header, tx, &w.current.header.GasUsed, *w.chain.GetVMConfig())
 	if err != nil {
 		w.current.state.RevertToSnapshot(snap)
+		w.current.dposContext.RevertToSnapShot(dposSnap)
 		return nil, err
 	}
 	w.current.txs = append(w.current.txs, tx)
@@ -960,6 +966,7 @@ func (w *worker) commit(uncles []*types.Header, interval func(), update bool, st
 	if err != nil {
 		return err
 	}
+	block.DposContext = w.current.dposContext
 	if w.isRunning() {
 		if interval != nil {
 			interval()

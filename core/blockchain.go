@@ -31,6 +31,8 @@ import (
 	"github.com/ethereum/go-ethereum/common/mclock"
 	"github.com/ethereum/go-ethereum/common/prque"
 	"github.com/ethereum/go-ethereum/consensus"
+	"github.com/ethereum/go-ethereum/consensus/dpos"
+	"github.com/ethereum/go-ethereum/core/dao"
 	"github.com/ethereum/go-ethereum/core/rawdb"
 	"github.com/ethereum/go-ethereum/core/state"
 	"github.com/ethereum/go-ethereum/core/types"
@@ -946,6 +948,10 @@ func (bc *BlockChain) WriteBlockWithState(block *types.Block, receipts []*types.
 	}
 	rawdb.WriteBlock(bc.db, block)
 
+	if _, err := block.DposContext.CommitTo(); err != nil {
+		return NonStatTy, err
+	}
+
 	root, err := state.Commit(bc.chainConfig.IsEIP158(block.Number()))
 	if err != nil {
 		return NonStatTy, err
@@ -1197,6 +1203,10 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		if parent == nil {
 			parent = bc.GetBlock(block.ParentHash(), block.NumberU64()-1)
 		}
+		block.DposContext, err = dao.NewDposContextFromProto(bc.db, parent.Header().DposContext)
+		if err != nil {
+			return it.index, events, coalescedLogs, err
+		}
 		state, err := state.New(parent.Root(), bc.stateCache)
 		if err != nil {
 			return it.index, events, coalescedLogs, err
@@ -1213,6 +1223,21 @@ func (bc *BlockChain) insertChain(chain types.Blocks, verifySeals bool) (int, []
 		if err := bc.Validator().ValidateState(block, parent, state, receipts, usedGas); err != nil {
 			bc.reportBlock(block, receipts, err)
 			return it.index, events, coalescedLogs, err
+		}
+		// Validate the dpos state using the default validator
+		err = bc.Validator().ValidateDposState(block)
+		if err != nil {
+			bc.reportBlock(block, receipts, err)
+			return it.index, events, coalescedLogs, err
+		}
+		// Validate validator
+		dposEngine, isDpos := bc.engine.(*dpos.Dpos)
+		if isDpos {
+			err = dposEngine.VerifySeal(bc, block.Header())
+			if err != nil {
+				bc.reportBlock(block, receipts, err)
+				return it.index, events, coalescedLogs, err
+			}
 		}
 		t2 := time.Now()
 		proctime := time.Since(start)
@@ -1744,4 +1769,9 @@ func (bc *BlockChain) SubscribeChainSideEvent(ch chan<- ChainSideEvent) event.Su
 // SubscribeLogsEvent registers a subscription of []*types.Log.
 func (bc *BlockChain) SubscribeLogsEvent(ch chan<- []*types.Log) event.Subscription {
 	return bc.scope.Track(bc.logsFeed.Subscribe(ch))
+}
+
+// DposContextFromContextAt returns a new DposContext based on a particular point in time.
+func (bc *BlockChain) DposContextFromProtoAt(ctxProto *dao.DposContextProto) (*dao.DposContext, error) {
+	return dao.NewDposContextFromProto(bc.db, ctxProto)
 }
