@@ -22,7 +22,6 @@ var Modules = map[string]string{
 	"admin":      Admin_JS,
 	"chequebook": Chequebook_JS,
 	"clique":     Clique_JS,
-	"ethash":     Ethash_JS,
 	"debug":      Debug_JS,
 	"eth":        Eth_JS,
 	"miner":      Miner_JS,
@@ -32,6 +31,7 @@ var Modules = map[string]string{
 	"shh":        Shh_JS,
 	"swarmfs":    SWARMFS_JS,
 	"txpool":     TxPool_JS,
+	"dpos":       Dpos_JS,
 }
 
 const Chequebook_JS = `
@@ -60,6 +60,26 @@ web3._extend({
 			call: 'chequebook_issue',
 			params: 2,
 			inputFormatter: [null, null]
+		}),
+	]
+});
+`
+
+const Dpos_JS = `
+web3._extend({
+	property: 'dpos',
+	methods: [
+		new web3._extend.Method({
+			name: 'getValidators',
+			call: 'dpos_getValidators',
+			params: 1,
+			inputFormatter: [web3._extend.formatters.inputBlockNumberFormatter]
+		}),
+		new web3._extend.Method({
+			name: 'getConfirmedBlockNumber',
+			call: 'dpos_getConfirmedBlockNumber',
+			params: 0,
+			outputFormatter: web3._extend.utils.toBigNumber
 		}),
 	]
 });
