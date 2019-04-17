@@ -19,6 +19,7 @@ package types
 
 import (
 	"encoding/binary"
+	"fmt"
 	"io"
 	"math/big"
 	"sort"
@@ -377,6 +378,40 @@ func (b *Block) Hash() common.Hash {
 	v := b.header.Hash()
 	b.hash.Store(v)
 	return v
+}
+
+func (b *Block) String() string {
+	str := fmt.Sprintf(`Block(#%v): Size: %v {
+Transactions:
+%v
+Uncles:
+%v
+}
+`, b.Number(), b.Size(), b.header, b.transactions, b.uncles)
+	return str
+}
+
+func (h *Header) String() string {
+	return fmt.Sprintf(`Header(%x):
+[
+	ParentHash:     %x
+	UncleHash:      %x
+	Validator:      %x
+	Coinbase:       %x
+	Root:           %x
+	TxSha:          %x
+	ReceiptSha:     %x
+	DposContext:    %x
+	Bloom:          %x
+	Difficulty:     %v
+	Number:         %v
+	GasLimit:       %v
+	GasUsed:        %v
+	Time:           %v
+	Extra:          %s
+	MixDigest:      %x
+	Nonce:          %x
+]`, h.Hash(), h.ParentHash, h.UncleHash, h.Validator, h.Coinbase, h.Root, h.TxHash, h.ReceiptHash, h.DposContext, h.Bloom, h.Difficulty, h.Number, h.GasLimit, h.GasUsed, h.Time, h.Extra, h.MixDigest, h.Nonce)
 }
 
 type Blocks []*Block

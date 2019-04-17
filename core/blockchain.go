@@ -1565,10 +1565,8 @@ func (bc *BlockChain) PostChainEvents(events []interface{}, logs []*types.Log) {
 		switch ev := event.(type) {
 		case ChainEvent:
 			bc.chainFeed.Send(ev)
-
 		case ChainHeadEvent:
 			bc.chainHeadFeed.Send(ev)
-
 		case ChainSideEvent:
 			bc.chainSideFeed.Send(ev)
 		}
