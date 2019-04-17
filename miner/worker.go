@@ -1051,7 +1051,7 @@ func (w *worker) mintLoop() {
 		case now := <-ticker:
 			clearPending(w.chain.CurrentBlock().NumberU64())
 			timestamp = now.Unix()
-			commit(false, commitInterruptNewHead)
+			commit(true, commitInterruptNewHead)
 
 			//		case <-timer.C:
 			//			// If mining is running resubmit a new work cycle periodically to pull in
