@@ -39,6 +39,7 @@ type testgeth struct {
 
 	// template variables for expect
 	Datadir   string
+	Validator string
 	Etherbase string
 }
 
@@ -75,6 +76,11 @@ func runGeth(t *testing.T, args ...string) *testgeth {
 		case arg == "-etherbase" || arg == "--etherbase":
 			if i < len(args)-1 {
 				tt.Etherbase = args[i+1]
+			}
+		}
+		case arg == "-validator" || arg == "--validator":
+			if i < len(args)-1 {
+				tt.Validator = args[i+1]
 			}
 		}
 	}
