@@ -98,6 +98,7 @@ func newTester(t *testing.T, confOverride func(*eth.Config)) *tester {
 	ethConf := &eth.Config{
 		Genesis:   core.DeveloperGenesisBlock(15, common.Address{}),
 		Etherbase: common.HexToAddress(testAddress),
+		Validator: common.HexToAddress(testAddress),
 		Ethash: ethash.Config{
 			PowMode: ethash.ModeTest,
 		},
@@ -170,6 +171,9 @@ func TestWelcome(t *testing.T) {
 	}
 	if want := fmt.Sprintf("instance: %s", testInstance); !strings.Contains(output, want) {
 		t.Fatalf("console output missing instance: have\n%s\nwant also %s", output, want)
+	}
+	if want := fmt.Sprintf("validator: %s", testAddress); !strings.Contains(output, want) {
+		t.Fatalf("console output missing validator: have\n%s\nwant also %s", output, want)
 	}
 	if want := fmt.Sprintf("coinbase: %s", testAddress); !strings.Contains(output, want) {
 		t.Fatalf("console output missing coinbase: have\n%s\nwant also %s", output, want)
