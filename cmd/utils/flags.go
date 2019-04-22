@@ -393,6 +393,16 @@ var (
 		Name:  "miner.noverify",
 		Usage: "Disable remote sealing verification",
 	}
+	MinerValidatorFlag = cli.StringFlag{
+		Name:  "miner.validator",
+		Usage: "Public address for block mining signer (default = first account created)",
+		Value: "0",
+	}
+	MinerLegacyValidatorFlag = cli.StringFlag{
+		Name:  "validator",
+		Usage: "Public address for block mining signer (default = first account created,  deprecated, use --miner.validator))",
+		Value: "0",
+	}
 	// Account settings
 	UnlockedAccountFlag = cli.StringFlag{
 		Name:  "unlock",
@@ -881,6 +891,27 @@ func MakeAddress(ks *keystore.KeyStore, account string) (accounts.Account, error
 	return accs[index], nil
 }
 
+// setValidator retrieves the validator either from the directly specified
+// command line flags or from the keystore if CLI indexed.
+func setValidator(ctx *cli.Context, ks *keystore.KeyStore, cfg *eth.Config) {
+	// Extract the current validator, new flag overriding legacy one
+	var validator string
+	if ctx.GlobalIsSet(MinerLegacyValidatorFlag.Name) {
+		validator = ctx.GlobalString(MinerLegacyValidatorFlag.Name)
+	}
+	if ctx.GlobalIsSet(MinerValidatorFlag.Name) {
+		validator = ctx.GlobalString(MinerValidatorFlag.Name)
+	}
+	// Convert the validator into an address and configure it
+	if validator != "" {
+		account, err := MakeAddress(ks, validator)
+		if err != nil {
+			Fatalf("Invalid miner validator: %v", err)
+		}
+		cfg.Validator = account.Address
+	}
+}
+
 // setEtherbase retrieves the etherbase either from the directly specified
 // command line flags or from the keystore if CLI indexed.
 func setEtherbase(ctx *cli.Context, ks *keystore.KeyStore, cfg *eth.Config) {
@@ -1179,6 +1210,7 @@ func SetEthConfig(ctx *cli.Context, stack *node.Node, cfg *eth.Config) {
 	checkExclusive(ctx, LightServFlag, SyncModeFlag, "light")
 
 	ks := stack.AccountManager().Backends(keystore.KeyStoreType)[0].(*keystore.KeyStore)
+	setValidator(ctx, ks, cfg)
 	setEtherbase(ctx, ks, cfg)
 	setGPO(ctx, &cfg.GPO)
 	setTxPool(ctx, &cfg.TxPool)

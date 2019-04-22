@@ -198,6 +198,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MinerExtraDataFlag,
 			utils.MinerRecommitIntervalFlag,
 			utils.MinerNoVerfiyFlag,
+			utils.MinerValidatorFlag,
 		},
 	},
 	{
@@ -246,6 +247,7 @@ var AppHelpFlagGroups = []flagGroup{
 			utils.MinerLegacyGasPriceFlag,
 			utils.MinerLegacyEtherbaseFlag,
 			utils.MinerLegacyExtraDataFlag,
+			utils.MinerLegacyValidatorFlag,
 		},
 	},
 	{
