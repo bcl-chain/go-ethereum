@@ -51,6 +51,11 @@ func NewPublicEthereumAPI(e *Ethereum) *PublicEthereumAPI {
 	return &PublicEthereumAPI{e}
 }
 
+// Validator is the address that mining signer
+func (api *PublicEthereumAPI) Validator() (common.Address, error) {
+	return api.e.Validator()
+}
+
 // Etherbase is the address that mining rewards will be send to
 func (api *PublicEthereumAPI) Etherbase() (common.Address, error) {
 	return api.e.Etherbase()
@@ -135,6 +140,12 @@ func (api *PrivateMinerAPI) SetGasPrice(gasPrice hexutil.Big) bool {
 	api.e.lock.Unlock()
 
 	api.e.txPool.SetGasPrice((*big.Int)(&gasPrice))
+	return true
+}
+
+// SetValidator sets the validator of the miner
+func (api *PrivateMinerAPI) SetValidator(validator common.Address) bool {
+	api.e.SetValidator(validator)
 	return true
 }
 
